@@ -10,11 +10,11 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # Hyper-parameters
 num_epochs = 10
 batch_size = 64
-learning_rate = 0.001
+learning_rate = 0.0001
 
 # Data augmentation transforms
 train_transform = transforms.Compose([
-    transforms.RandomCrop(32, padding=4),
+    transforms.RandomCrop(224, padding=4),
     transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
@@ -103,7 +103,7 @@ train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size,
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size,
                                           shuffle=False)
 
-def train(model, train_loader, criterion, optimizer, device, epoch):
+def train(model, train_loader, criterion, optimizer, device, epoch, smoothing=0.1):
     model.train()
     train_loss = 0
     correct = 0
@@ -113,9 +113,15 @@ def train(model, train_loader, criterion, optimizer, device, epoch):
         images = images.to(device)
         labels = labels.to(device)
 
+        # Apply label smoothing
+        num_classes = model.fc2.out_features
+        one_hot_labels = torch.zeros(labels.size(0), num_classes).to(device)
+        one_hot_labels.scatter_(1, labels.view(-1, 1), 1)
+        one_hot_labels = one_hot_labels * (1 - smoothing) + smoothing / num_classes
+
         # Forward pass
         outputs = model(images)
-        loss = criterion(outputs, labels)
+        loss = criterion(outputs, one_hot_labels)
 
         # Backward and optimize
         optimizer.zero_grad()
